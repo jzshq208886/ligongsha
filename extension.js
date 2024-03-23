@@ -1479,6 +1479,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 						},
 					},
 				},
+				audio:'ext:理工杀:1',
 				enable:"phaseUse",
 				selectTarget:1,
 				filterTarget:function(card,player,target){
@@ -1558,6 +1559,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 				},
 			},
 			"lgs_yange":{
+				audio:'ext:理工杀:1',
 				trigger:{
 					player:"judge",
 				},
@@ -1949,6 +1951,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 				},
 			},
 			"lgs_boshi":{
+				audio:'shelie',
 				trigger:{
 					player:"phaseDrawBegin1",
 				},
@@ -2452,6 +2455,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 				},
 			},
 			"lgs_polu":{
+				audio:'benxi',
 				enable:"phaseUse",
 				selectTarget:1,
 				selectCard:1,
@@ -2626,6 +2630,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 				},
 			},
 			"lgs_juesha":{
+				audio:'shajue',
 				trigger:{
 					player:'useCardToPlayered',
 				},
@@ -4638,6 +4643,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 				},
 			},
 			lgs_jisun_move:{
+				audio:'haoshi2',
 				enable:'phaseUse',
 				prompt:'出牌阶段，你可以将判定区里的【闪电】移动给其他角色',
 				filter:function(event,player){
@@ -4680,6 +4686,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 				group:['lgs_hongqi_one','lgs_hongqi_more'],
 			},
 			lgs_hongqi_one:{
+				audio:'beini',
 				trigger:{global:'damageEnd'},
 				filter:function(event,player){
 					return event.num==1&&event.player!=player&&!player.hasSkill('lgs_hongqi_one_disable')&&event.player.countCards('he');
@@ -4689,27 +4696,28 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 					'step 0'
 					event.target=trigger.player;
 					trigger.player.chooseCard('是否发动【宏器】，交给'+get.translation(player)+'一张牌？','he').set('ai',function(card){
-						if(get.attitude(event.target,player)<0) return -1;
+						var current=_status.event.getTrigger().player
+						if(get.attitude(current,_status.event.player)<0) return -1;
 						var X=0;
-						game.countPlayer(function(current){
-							X+=current.countCards('j');
+						game.countPlayer(function(currentx){
+							X+=currentx.countCards('j');
 						});
 						if(!X) return -1;
-						if(player.countCards('h')>=X&&player.countCards('h')>=3) return -1;
+						if(current.countCards('h')>=X&&current.countCards('h')>=3) return -1;
 						return 6-get.value(card)+(get.position(card)=='h'?1:0);
 					});
 					'step 1'
 					var X=0
 					if(result.bool){
 						player.addTempSkill('lgs_hongqi_one_disable','roundStart');
-						player.logSkill('lgs_hongqi',target);
+						player.logSkill('lgs_hongqi_one',target);
 						player.gain(result.cards,target,'give');
 						game.filterPlayer(function(current){
 							X+=current.countCards('j');
 						});
 						event.X=X;
 						if(X==3)
-							player.chooseBool('是否令'+get.translation(target)+'摸三张牌并将手牌弃置到3张？').set('ai',function(){
+							player.chooseBool('是否令'+get.translation(target)+'摸3张牌并将手牌弃置到3张？').set('ai',function(){
 								var evt=_status.event.getParent(),player=evt.player,target=evt.target;
 								if(get.attitude(player,target)>=0) return target.countCards('h')<=3;
 								return target.countCards('h')>=5;
@@ -4740,6 +4748,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 					'step 2'
 					event.draw=3;
 					event.save=3;
+					game.log(result.index);
 					if(typeof result.index=='number'){
 						if(result.index==0){
 							event.save=event.X;
@@ -4748,7 +4757,8 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 						}else{
 							event.finish();
 						}
-					}else if(!result.bool) event.finish;
+					}else if(!result.bool)
+						event.finish();
 					'step 3'
 					target.draw(event.draw);
 					'step 4'
@@ -4761,6 +4771,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 				},
 			},
 			lgs_hongqi_more:{
+				audio:'beini',
 				trigger:{global:'damageBegin4'},
 				filter:function(event,player){
 					return event.num>1&&!player.hasSkill('lgs_hongqi_more_disable');
@@ -5992,6 +6003,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 			},
 			lgs_jingyao: {
 				audio: 'xinfu_jianjie2',
+				// audio: 'lixia2',
 				limited: true,
 				skillAnimation: true,
 				animationColor: "green",
@@ -6637,6 +6649,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 						return target!=evt.target;
 					},function(target){
 						if(!_status.event.go) return 0;
+						var player=_status.event.player
 						if(get.attitude(player,target)>0) return 0;
 						return 999-target.countCards('h');
 					}).set('go',player.hp>1||player.countCards('h',function(card){
@@ -8904,7 +8917,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 					},
 				},
 			},
-			lgs_shenhuai:{
+			lgs_oldshenhuai:{
 				audio:"ext:理工杀:2",
 				init:function(player){
 					player.storage.lgs_shenhuai=[];
@@ -8937,6 +8950,52 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 				},
 				ai:{
 					threaten:1.3,
+				},
+			},
+			lgs_shenhuai: {
+				audio:"ext:理工杀:2",
+				init:function(player){
+					player.storage.lgs_shenhuai=[];
+				},
+				trigger:{global:'dying'},
+				filter:function(event,player){
+					return event.player.hp<=0 && !player.storage.lgs_shenhuai.contains(event.player);
+				},
+				direct: true,
+				content: function() {
+					'step 0'
+					var choice = ['失去1点体力', 'cancel2']
+					if (player.countCards('he', function(card){
+						return lib.filter.cardDiscardable(card, player, 'lgs_shenhuai');
+					}) >= 2) choice.unshift('弃2张牌');
+					player.chooseControl(choice).set('prompt', get.prompt2('lgs_shenhuai')).set('ai', function(evt, player) {
+						var target = evt.getTrigger().player
+						game.log(player, target);
+						if (get.attitude(player, target) <= 0) return 'cancel2';
+						if (_status.event.controls.contains('弃2张牌') && player.countCards('he', function(card) {
+							return get.value(card) < 6;
+						}) >= 2) return '弃2张牌';
+						if (player.hp > 1) return '失去1点体力';
+						return 'cancel2';
+					});
+					'step 1' // 选择结果判断逻辑
+					if (result.control == '弃2张牌') {
+						player.chooseToDiscard('he', 2).logSkill = ['lgs_shenhuai', trigger.player];
+					} else if (result.control == '失去1点体力') {
+						event.goto(3);
+					} else
+						event.finish();
+					'step 2' // 弃牌结果判断逻辑
+					event.goto(result.bool ? 4 : 0);
+					'step 3'
+					player.logSkill('lgs_shenhuai', trigger.player);
+					player.loseHp();
+					'step 4'
+					player.storage.lgs_shenhuai.push(trigger.player);
+					trigger.player.recover();
+					'step 5'
+					player.addTempSkill('lgs_yaowu', {player: 'phaseEnd'});
+					player.addTempSkill('lgs_yangwei', {player: 'phaseEnd'});
 				},
 			},
 			lgs_yaowu:{
@@ -9422,6 +9481,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 				},
 			},
 			lgs_biluo:{
+				audio: 'mozhi',
 				trigger:{
 					player:'loseAfter',
 					global:'cardsDiscardAfter',
@@ -9505,7 +9565,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 					},
 				},
 			},
-			lgs_qinhe:{
+			lgs_oldqinhe:{
 				locked:true,
 				group:['lgs_qinhe_give','lgs_qinhe_gain'],
 			},
@@ -9569,6 +9629,126 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 					'step 1'
 					if(result.bool)
 						player.gain(event.cards,'gain2','log');
+				},
+			},
+			lgs_qinhe: {
+				audio: 'hongyi',
+				init(player) {
+					player.storage.lgs_qinhe_usable = 2;
+				},
+				enable: 'phaseUse',
+				filter(event, player) {
+					return player.storage.lgs_qinhe_usable;
+				},
+				filterTarget(card, player, target) {
+					return !target.hasSkill('lgs_qinhe_he');
+				},
+				content() {
+					player.addTempSkill('lgs_qinhe_reusable', 'phaseUseEnd');
+					player.storage.lgs_qinhe_usable--;
+					target.addSkill('lgs_qinhe_he');
+					target.storage.lgs_qinhe_he_source = player;
+				},
+				ai: {
+					order: 1,
+					result: {
+						target(player, target) {
+							if (player == target) {
+								if (!player.hasSkill('lgs_biluo')) return 5;
+								return (player.needsToDiscard() && player.hasCard(function(card) {
+									return get.tag(card, 'damage') && player.hasValueTarget(card);
+								}, 'h') ? 0 : 5);
+							} else {
+								var effect = -2, current = player.next
+								if (get.attitude(player, target) > 0) {
+									while (current != target) {
+										if (get.attitude(player, current) < 0) effect += 1;
+										current = current.next;
+									}
+									return effect + (3 - target.countCards('h'));
+								} else if (get.attitude(player, target) < 0) {
+									effect = 2;
+									while (current != target) {
+										if (get.attitude(player, current) > 0) effect -= 1;
+										current = current.next;
+									}
+									return effect + target.countCards('h');
+								}
+							}
+							return 0;
+						},
+					},
+				},
+				group: ['lgs_qinhe_he1', 'lgs_qinhe_he2'],
+				subSkill: {
+					he: {
+						charlotte: true,
+						mark: true,
+						marktext: '和',
+						intro: {
+							name: '亲和',
+							name2: '和',
+							content: '当前拥有“和”标记',
+						},
+					},
+					he1: {
+						trigger: {global: 'damageEnd'},
+						filter(event, player) {
+							return event.player.isAlive() && event.player.hasSkill('lgs_qinhe_he') && event.player.storage.lgs_qinhe_he_source == player;
+						},
+						forced: true,
+						locked: false,
+						logTarget: 'player',
+						content() {
+							'step 0'
+							trigger.player.draw(2);
+							'step 1'
+							player.chooseBool('亲和：是否移除'+get.translation(trigger.player)+'的“和”标记？').set('ai', function() {
+								var player = _status.event.player, target = _status.event.getTrigger().player
+								var effect = -2, current = _status.currentPhase.next
+								if (get.attitude(player, target) > 0) {
+									while (current != target) {
+										if (get.attitude(player, current) < 0) effect += 1;
+										current = current.next;
+									}
+									return effect + (3 - target.countCards('h')) > 0;
+								} else if (get.attitude(player, target) < 0) {
+									effect = 2;
+									while (current != target) {
+										if (get.attitude(player, current) > 0) effect -= 1;
+										current = current.next;
+									}
+									return effect + target.countCards('h') > 0;
+								}
+								return true;
+							});
+							'step 2'
+							if (result.bool)
+								trigger.player.removeSkill('lgs_qinhe_he');
+						},
+					},
+					he2: {
+						trigger: {global: 'damageSource'},
+						filter(event, player) {
+							return event.source.isAlive() && event.source.hasSkill('lgs_qinhe_he') && event.source.storage.lgs_qinhe_he_source == player;
+						},
+						forced: true,
+						locked: false,
+						logTarget: 'source',
+						content() {
+							trigger.source.removeSkill('lgs_qinhe_he');
+							if(trigger.source.hasCard(function(card){
+								return lib.filter.cardDiscardable(card, trigger.source, 'lgs_qinhe');
+							}, 'he'))
+								trigger.source.chooseToDiscard(true, 2, 'he');
+						}
+					},
+					reusable: {
+						charlotte: true,
+						onremove(player) {
+							player.storage.lgs_qinhe_usable = 2;
+						},
+					},
 				},
 			},
 			lgs_shiyuan:{
@@ -9887,7 +10067,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 			lgs_wendao:{
 				enable:"chooseToUse",
 				filter:function(event,player){
-					return event.type!='wuxie'&&!event.lgs_wendao_block;
+					return event.type!='wuxie'&&event.type!='dying'&&!event.lgs_wendao_block;
 				},
 				selectCard:[1,2],
 				filterCard:true,
@@ -10657,6 +10837,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 				},
 			},
 			lgs_yunshi:{
+				audio:'caishi',
 				enable:'phaseUse',
 				usable:1,
 				filter:function(event,player){
@@ -11984,6 +12165,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 			"lgs_jisun_move":"极损",
 			"lgs_jisun_info":"你可以将♠牌当【闪电】使用；出牌阶段，你可以将判定区里的【闪电】移动给其他角色。",
 			"lgs_hongqi":"宏器",
+			"lgs_hongqi_one":"宏器",
 			"lgs_hongqi_more":"宏器",
 			"lgs_hongqi_info":"每轮各限一次，1.其他角色受到值为1的伤害时，其可以交给你一张牌，若如此做，你可以选择一项：令其摸3张牌并将手牌弃置至X张，或令其摸X张牌并将手牌弃置至3张。2.一名角色即将受到值＞1的伤害时，你可以令其摸等同于伤害值的牌，然后此伤害减至1。（X为场上判定区内的牌数）",
 			"lgs_hanxiao":"涵笑",
@@ -12079,14 +12261,14 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 			"lgs_caisi":"才思",
 			"lgs_caisi_info":"你可以将【闪电】和【闪】、【火攻】和火【杀】、【桃园结义】和【桃】、【无中生有】和【无懈可击】相互转化使用或打出。",
 			"lgs_chijiang":"驰疆",
-			"lgs_chijiang_info":"锁定技，当你使用牌指定目标时，令所有成为目标的其他角色获得“疆”标记。若一名有“疆”标记的角色与某角色A距离为1，则你与角色A距离视为1。结束阶段，若你与全场角色距离为1，你失去一点体力或减一点体力上限，获得所有其他角色区域内的各一张牌，然后弃置等同于场上“疆”标记数的牌并移除所有“疆”标记。",
+			"lgs_chijiang_info":"锁定技，当你使用牌指定目标时，你令除你以外的所有目标获得“疆”标记。你与有“疆”标记的角色及其相邻角色计算距离视为1。结束阶段，若你与全场角色距离1以内，你失去一点体力或减一点体力上限，获得所有其他角色区域内的各一张牌，然后弃置等同于场上“疆”标记数的牌并移除所有“疆”标记。",
 			"lgs_huiyou":"会友",
-			"lgs_huiyou_info":"当手牌数小于你的角色受到伤害后，你可以将所有手牌交给该角色，然后若你没有护甲，其可以令你获得一点护甲。",
+			"lgs_huiyou_info":"出牌阶段，你可以弃置任意张手牌，若如此做，你选择一名手牌数小于你的角色，其摸等量的牌，然后摸X张牌（X为你与其手牌中都包含的花色数）。",
 			"lgs_yinwei":"淫威",
 			"lgs_yinwei_xiongluan":"淫威",
-			"lgs_yinwei_info":"当你使用杀指定一个目标时，可以执行以下效果：若你的手牌数大于该角色，本回合其不能使用手牌；若你的体力值大于该角色，此杀对其伤害+1；若你的技能数大于该角色，本回合其非锁定技失效。",
+			"lgs_yinwei_info":"当你使用【杀】指定一个目标时，你可以执行以下效果：若你的手牌数大于该角色，本回合其不能使用手牌；若你的体力值大于该角色，此【杀】对其伤害+1；若你的技能数大于该角色，本回合其非锁定技失效。",
 			"lgs_shenhuai":"深怀",
-			"lgs_shenhuai_info":"锁定技，每局游戏限4次，且对每名角色限一次。一名角色进入濒死状态时，你可以令其回复一点体力，然后根据发动〖深怀〗的次数，你执行以下效果：一次，获得技能〖耀武〗；两次，获得技能〖扬威〗；三次，减一点体力上限；四次，弃置两张牌。",
+			"lgs_shenhuai_info":"对每名角色限一次。一名角色进入濒死状态时，你可以弃置2张牌或失去1点体力，令其回复1点体力，若如此做，直到你的下个回合结束，你获得技能〖耀武〗和〖扬威〗。",
 			"lgs_yaowu":"耀武",
 			"lgs_yaowu_info":"锁定技，当一名角色使用【杀】对你造成伤害时，若此杀为红色，该角色回复1点体力或摸一张牌。否则你摸一张牌。",
 			"lgs_yangwei":"扬威",
@@ -12107,11 +12289,11 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 			"lgs_yiying":"义膺",
 			"lgs_yiying_info":"每回合限一次，其他角色使用的目标包含自己的红色牌结算后，若其体力值大于你，你可以选择一项：1.弃置其一张牌；2.视为对其使用一张无距离限制的【杀】。背水：弃置两张手牌。",
 			"lgs_biluo":"笔落",
-			"lgs_biluo_info":"当你的一张基本牌或普通锦囊牌因使用之外的原因进入弃牌堆时，你可以视为使用一张此牌名的牌（不计次数，无距离限制）。",
+			"lgs_biluo_info":"当你的一张基本牌或普通锦囊牌（包括你的判定牌）因使用之外的原因进入弃牌堆时，你可以视为使用一张与此牌相同的牌（不计次数，无距离限制）。",
 			"lgs_qinhe":"亲和",
 			"lgs_qinhe_give":"亲和",
 			"lgs_qinhe_gain":"亲和",
-			"lgs_qinhe_info":"当你使用的牌对其他角色造成伤害时，你可以将此牌交给该角色；其他角色打出牌时，你可以弃一张牌，获得这些牌中的一张。",
+			"lgs_qinhe_info":"出牌阶段限2次，你可以令一名没有“和”标记的角色获得“和”标记。有“和”标记的角色：1.受到伤害时，摸2张牌，且你可以移除其“和”标记；2.造成伤害时，移除“和”标记并弃置2张牌。",
 			"lgs_shiyuan":"释怨",
 			"lgs_shiyuan_info":"当一名角色使用【杀】指定一个目标时，你可以取消之，该角色收回此【杀】，然后根据你对该角色发动〖释怨〗的次数执行以下效果：一次，你与其各摸一张牌；两次，其可以对你使用一张【杀】；三次，你失去技能〖释怨〗。",
 			"lgs_qianyin":"千音",
@@ -12125,9 +12307,9 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 			"lgs_zhiqian_discard":"执前",
 			"lgs_zhiqian_info":"锁定技，摸牌阶段，若你的手牌数为全场最少，你改为摸X张牌（X为手牌最多角色手牌数）；弃牌阶段，若你的手牌数为全场最多，你改为弃Y张牌（Y为手牌最少角色手牌数）。",
 			"lgs_wendao":"问道",
-			"lgs_wendao_info":"当你需要使用牌时（需要使用【无懈可击】时除外），你可以弃两张牌并摸一张牌，或弃一张牌并摸两张牌。若如此做，①本次你使用与弃置的牌同花色的牌无次数与距离限制，②本次你不能使用与摸的牌同类型的牌。",
+			"lgs_wendao_info":"当你需要使用牌时（濒死使用【桃】【酒】和使用【无懈可击】时除外），你可以弃两张牌并摸一张牌，或弃一张牌并摸两张牌。若如此做，①本次你使用与弃置的牌同花色的牌无次数与距离限制，②本次你不能使用与摸的牌同类型的牌。",
 			"lgs_fengsao":"风骚",
-			"lgs_fengsao_info":"每回合限三次，你可以将一张牌当作其他角色使用牌历史记录中的倒数第X张非装备牌使用（X为本回合你发动此技能的次数；以此法使用牌无距离与次数限制）。",
+			"lgs_fengsao_info":"每回合限3次，你可以将一张牌当作其他角色使用牌历史记录中的倒数第X张非装备牌使用（X为本回合你发动此技能的次数；以此法使用牌无距离与次数限制）。",
 			"lgs_weizun":"唯尊",
 			"lgs_weizun_info":"限定技，出牌阶段，你可以选择一名目标，然后令除你以外的所有角色依次执行：其可以对该目标使用一张牌，若其使用了牌，本局游戏你于出牌阶段可使用杀的次数+1，若其未使用牌，你可以视为对其使用一张杀（不计次数）。",
 			"lgs_liangcong":"良从",
@@ -12240,6 +12422,10 @@ game.import('character',function(lib,game,ui,get,ai,_status){
     },
     intro:(function(){
 		var log = [
+			'update in 2024/3/23',
+			'- 调整技能：〖亲和〗〖深怀〗，修复技能〖宏器〗的bug',
+			'- 为多个技能添加语音',
+			'',
 			'v2.1 2022-8-18',
 			'- 更新武将：王郁嘉，綦俊凯',
 			'',
