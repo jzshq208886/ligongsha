@@ -2830,6 +2830,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 				},
 			},
 			"lgs_fengyu":{
+				audio:'jiyu',
 				init:function(player){
 					player.storage.fengyued=[];
 				},
@@ -3326,6 +3327,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 						}
 						else{
 							player.logSkill('lgs_hairong',_status.currentPhase);
+							player.addExpose(0.2);
 							_status.currentPhase.draw(event.X);
 							player.addTempSkill('lgs_hairong_reduce');
 						}
@@ -5753,7 +5755,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 				},
 			},
 			"lgs_jieyi":{
-				// audio:'danlao',
+				audio:'jilei2',
 				trigger:{
 					global:"useCard",
 				},
@@ -6694,7 +6696,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 					player.storage.lgs_yingcun_targets=[];
 					player.storage.lgs_yingcun_record={};
 				},
-				mark:true,
+				// mark:true,
 				intro:{
 					mark:function(dialog,content,player){
 						for(var target of player.storage.lgs_yingcun_targets){
@@ -6785,6 +6787,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 								player.logSkill('lgs_yingcun_record',target);
 								player.storage.lgs_yingcun_targets.push(target);
 								player.storage.lgs_yingcun_record[target.playerid]=[target.maxHp,target.hp,target.countCards('h')];
+								player.markSkill('lgs_yingcun');
 								game.delay();
 							}
 							// else event.finish();
@@ -8293,7 +8296,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 					target.chooseToDiscard('请弃置2张牌','he',2,true);
 				},
 			},
-			lgs_jingshu:{
+			lgs_oldjingshu:{
 				init:function(player){
 					player.storage.lgs_jingshu=[];
 				},
@@ -8371,6 +8374,47 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 					},
 				},
 			},
+			lgs_jingshu:{
+				trigger:{player:'loseAfter'},
+				filter:function(event,player){
+					return event.type=='discard';
+				},
+				direct:true,
+				content:function(){
+					'step 0'
+					event.cards1=[];
+					event.cards2=[];
+					for(var card of trigger.hs){
+						if(trigger.gaintag_map[card.cardid]&&trigger.gaintag_map[card.cardid].contains('lgs_jingshu'))
+							event.cards1.push(card);
+						else
+							event.cards2.push(card);
+					}
+					event.cards2.addArray(trigger.es);
+					if(event.cards1.length){
+						player.logSkill('lgs_jingshu');
+						event.logged=true;
+						player.loseHp(event.cards1.length);
+					}
+					if(!event.cards2.length)
+						event.finish()
+					'step 1'
+					player.chooseCardButton([1,Infinity],trigger.cards2,'静姝：获得任意张没有“静姝”标记的牌').set('filterButton',function(button){
+						return _status.event.cards.contains(button.link);
+					}).set('cards',event.cards2).set('ai',function(button){});
+					'step 2'
+					if(result.bool){
+						event.cards=result.links;
+						if(!event.logged)
+							player.logSkill('lgs_jingshu');
+						player.gain(event.cards);
+						player.$gain2(event.cards);
+					}else
+						event.finish();
+					'step 3'
+					player.addGaintag(event.cards,'lgs_jingshu');
+				},
+			},
 			lgs_duyi:{
 				marktext:'毅',
 				intro:{
@@ -8396,13 +8440,13 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 					else if(!player.getExpansions('lgs_duyi').length) event.goto(2);
 					else {
 						event.two=true;
-						player.chooseControl('放置“毅”','获得“毅”','cancel');
+						player.chooseControl('放置“毅”','获得“毅”','cancel').set('prompt',get.prompt2('lgs_duyi'));
 					}
 					'step 1'
 					if(result.control=='cancel') event.finish();
 					else if(result.control=='获得“毅”') event.goto(5);
 					'step 2'
-					player.chooseCard('he').set('prompt','将一张牌置于武将牌上当作“毅”');
+					player.chooseCard('h').set('prompt','笃毅：将一张手牌置于武将牌上当作“毅”');
 		            'step 3'
 					if(result.bool){
 						player.logSkill('lgs_duyi');
@@ -8417,11 +8461,12 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 					player.draw();
 					event.goto(7);
 					'step 5'
-					player.chooseCardButton('选择获得任意张“毅”',[1,player.getExpansions('lgs_duyi').length],player.getExpansions('lgs_duyi'));
+					player.chooseCardButton('笃毅：获得任意张“毅”',[1,player.getExpansions('lgs_duyi').length],player.getExpansions('lgs_duyi'));
 					'step 6'
 					if(result.bool){
-						player.addTempSkill('lgs_duyi_block','phaseUseEnd');
+						player.logSkill('lgs_duyi');
 						game.delay(0.2);
+						player.addTempSkill('lgs_duyi_block');
 						player.gain(result.links,'give',player);
 					}else if(event.two)
 						event.goto(0);
@@ -8442,7 +8487,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 							player:'damageEnd',
 						},
 						filter:function(event,player){
-							return player.countCards('he')||player.getExpansions('lgs_duyi').length;
+							return lib.skill.lgs_duyi.filter(event,player);
 						},
 						frequent:true,
 						popup:false,
@@ -8452,13 +8497,13 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 							else if(!player.getExpansions('lgs_duyi').length) event.goto(2);
 							else {
 								event.two=true;
-								player.chooseControl('放置“毅”','获得“毅”','cancel');
+								player.chooseControl('放置“毅”','获得“毅”','cancel').set('prompt',get.prompt2('lgs_duyi'));
 							}
 							'step 1'
 							if(result.control=='cancel') event.finish();
 							else if(result.control=='获得“毅”') event.goto(5);
 							'step 2'
-							player.chooseCard('he').set('prompt','静姝：将一张牌置于武将牌上当作“毅”');;
+							player.chooseCard('h').set('prompt','笃毅：将一张手牌置于武将牌上当作“毅”');;
 							'step 3'
 							if(result.bool){
 								player.logSkill('lgs_duyi');
@@ -8472,11 +8517,12 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 							player.draw();
 							event.goto(7);
 							'step 5'
-							player.chooseCardButton('选择获得任意张“毅”',[1,player.getExpansions('lgs_duyi').length],player.getExpansions('lgs_duyi'));
+							player.chooseCardButton('笃毅：获得任意张“毅”',[1,player.getExpansions('lgs_duyi').length],player.getExpansions('lgs_duyi'));
 							'step 6'
 							if(result.bool){
 								player.logSkill('lgs_duyi');
 								game.delay(0.2);
+								player.addTempSkill('lgs_duyi_block');
 								player.gain(result.links,'give',player);
 							}else if(event.two)
 								event.goto(0);
@@ -9647,7 +9693,19 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 					player.addTempSkill('lgs_qinhe_reusable', 'phaseUseEnd');
 					player.storage.lgs_qinhe_usable--;
 					target.addSkill('lgs_qinhe_he');
-					target.storage.lgs_qinhe_he_source = player;
+					target.storage.lgs_qinhe_he_source.push(player);
+				},
+				onremove(player) {
+					game.countPlayer2(function(current) {
+						lib.skill.lgs_qinhe.removeHe(current, player);
+					});
+				},
+				removeHe(player, source) {
+					if (Array.isArray(player.storage.lgs_qinhe_he_source)){
+						player.storage.lgs_qinhe_he_source.remove(source);
+						if (!player.storage.lgs_qinhe_he_source.length)
+							player.removeSkill('lgs_qinhe_he');
+					}
 				},
 				ai: {
 					order: 1,
@@ -9679,10 +9737,13 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 						},
 					},
 				},
-				group: ['lgs_qinhe_he1', 'lgs_qinhe_he2'],
+				group: ['lgs_qinhe_he1', 'lgs_qinhe_he2', 'lgs_qinhe_clear'],
 				subSkill: {
 					he: {
 						charlotte: true,
+						init(player) {
+							player.storage.lgs_qinhe_he_source = [];
+						},
 						mark: true,
 						marktext: '和',
 						intro: {
@@ -9694,7 +9755,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 					he1: {
 						trigger: {global: 'damageEnd'},
 						filter(event, player) {
-							return event.player.isAlive() && event.player.hasSkill('lgs_qinhe_he') && event.player.storage.lgs_qinhe_he_source == player;
+							return event.player.isAlive() && event.player.hasSkill('lgs_qinhe_he') && event.player.storage.lgs_qinhe_he_source.contains(player);
 						},
 						forced: true,
 						locked: false,
@@ -9724,24 +9785,34 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 							});
 							'step 2'
 							if (result.bool)
-								trigger.player.removeSkill('lgs_qinhe_he');
+								lib.skill.lgs_qinhe.removeHe(trigger.player, player);
 						},
 					},
 					he2: {
 						trigger: {global: 'damageSource'},
 						filter(event, player) {
-							return event.source.isAlive() && event.source.hasSkill('lgs_qinhe_he') && event.source.storage.lgs_qinhe_he_source == player;
+							return event.source.isAlive() && event.source.hasSkill('lgs_qinhe_he') && event.source.storage.lgs_qinhe_he_source.contains(player);
 						},
 						forced: true,
 						locked: false,
 						logTarget: 'source',
 						content() {
-							trigger.source.removeSkill('lgs_qinhe_he');
+							lib.skill.lgs_qinhe.removeHe(trigger.source, player);
 							if(trigger.source.hasCard(function(card){
 								return lib.filter.cardDiscardable(card, trigger.source, 'lgs_qinhe');
 							}, 'he'))
 								trigger.source.chooseToDiscard(true, 2, 'he');
 						}
+					},
+					clear: {
+						trigger: {player: 'die'},
+						filter: true,
+						forced: true,
+						content() {
+							game.countPlayer2(function(current) {
+								lib.skill.lgs_qinhe.removeHe(current, player);
+							});
+						},
 					},
 					reusable: {
 						charlotte: true,
@@ -9802,26 +9873,27 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 			lgs_qianyin:{
 				init:function(player){
 					player.storage.lgs_qianyin=[
-						'lgs_gangrou','lgs_yanhuan','lgs_beishan','lgs_xingchi','lgs_bushi','lgs_boshi','lgs_youtu','lgs_yian',
-						'lgs_yingsuo','lgs_tiewan','lgs_qishi','lgs_yange','lgs_polu','lgs_juesha','lgs_xinyou','lgs_qingshen',
-						'lgs_gangqu','lgs_liepo','lgs_zaoxing','lgs_qianye','lgs_tianle','lgs_jieyou','lgs_fangyan','lgs_ezuo',
-						'lgs_zhiyong','lgs_linyi','lgs_daimeng','lgs_shensuan','lgs_jinyi','lgs_qiujin','lgs_ganggan','lgs_xiyan',
-						'lgs_hanxiao','lgs_chenghuan','lgs_shanxuan','lgs_jieyi','lgs_guanglan','lgs_hairong','lgs_xingxi','lgs_bomie',
-						'lgs_fengyu','lgs_jianxing','lgs_jisun','lgs_hongqi','lgs_yonglan','lgs_yinzhi','lgs_yinwei','lgs_shenhuai',
-						'lgs_kubi','lgs_chengmian','lgs_zhiji','lgs_miaokou','lgs_feiqiu','lgs_yeyin','lgs_mengxu','lgs_yiying',
-						'lgs_qiezhu','lgs_shannian','lgs_jingyao','lgs_qiaohui','lgs_qingwei','lgs_langfang','lgs_qishang','lgs_shuanglun',
-						'lgs_yanta','lgs_yingcun','lgs_chijiang','lgs_huiyou','lgs_zhenji','lgs_xinxing','lgs_biluo','lgs_qinhe',
-						'lgs_xiaokan','lgs_caisi','lgs_kaizhu','lgs_jiangxin','lgs_jinyi','lgs_shuangzhi','lgs_jingshu','lgs_duyi',
-						'lgs_jifei','lgs_minghao','lgs_zhiqian','lgs_wendao','lgs_fengsao','lgs_weizun','lgs_liangcong','lgs_gufang',
+						'lgs_qishi','lgs_yange','lgs_yian','lgs_yingsuo','lgs_jieshen','lgs_fenqu','lgs_fengsao','lgs_weizun',
+						'lgs_beishan','lgs_jifei','lgs_minghao','lgs_zongyu','lgs_nixi','lgs_gangrou','lgs_yanhuan','lgs_tiewan',
+						'lgs_boshi','lgs_youtu','lgs_xingchi','lgs_bushi','lgs_polu','lgs_juesha','lgs_xinyou','lgs_qingshen',
+						'lgs_gangqu','lgs_liepo','lgs_zaoxing','lgs_qianye',
+						'lgs_jinyi','lgs_qiujin','lgs_daimeng','lgs_shensuan','lgs_fengyu','lgs_jianxing','lgs_yonglan','lgs_yinzhi',
+						'lgs_guanglan','lgs_hairong','lgs_kubi','lgs_tianle','lgs_jieyou','lgs_zhiyong','lgs_linyi','lgs_miaokou',
+						'lgs_jisun','lgs_hongqi','lgs_hanxiao','lgs_chenghuan','lgs_ganggan','lgs_xiyan','lgs_feiqiu','lgs_yeyin',
+						'lgs_qiezhu','lgs_shanxuan','lgs_jieyi','lgs_shannian','lgs_jingyao','lgs_qishang','lgs_qiaohui','lgs_qingwei',
+						'lgs_langfang','lgs_chengmian','lgs_zhiji','lgs_mengxu','lgs_yiying','lgs_shuanglun','lgs_yanta','lgs_yingcun',
+						'lgs_fangyan','lgs_ezuo','lgs_xingxi','lgs_bomie','lgs_zhenji','lgs_xinxing','lgs_jingshu','lgs_duyi',
+						'lgs_xiaokan','lgs_caisi','lgs_chijiang','lgs_huiyou','lgs_yinwei','lgs_shenhuai','lgs_qjinyi','lgs_shuangzhi',
+						'lgs_kaizhu','lgs_jiangxin','lgs_biluo','lgs_qinhe','lgs_zhiqian','lgs_wendao','lgs_liangcong','lgs_gufang',
 						'lgs_yasi','lgs_linuo','lgs_chaojie','lgs_jueyi','lgs_qinmian','lgs_yunshi','lgs_jiaoxin','lgs_keyan',
-						'lgs_renjian','lgs_zhanyue','lgs_huixie','lgs_jieshen','lgs_fenqu','lgs_shouye','lgs_ciai','lgs_zongyu',
-						'lgs_nixi',//'lgs_','lgs_','lgs_','lgs_','lgs_','lgs_','lgs_',
+						'lgs_renjian','lgs_shouye','lgs_ciai','lgs_zhanyue','lgs_huixie','lgs_touliang','lgs_huanzhu','lgs_zhenmi',
+						'lgs_jiehuo'//,'lgs_','lgs_','lgs_',
 					];
 					if(game.mode=='identity')
 						player.storage.lgs_qianyin.push('lgs_huishi');
 				},
 				trigger:{
-					player:['damageEnd','recoverAfter'],
+					player:['damageAfter','recoverAfter'],
 					source:'damageSource',
 				},
 				filter:true,
@@ -10272,7 +10344,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 					},
 				},
 			},
-			lgs_liangcong:{
+			lgs_oldliangcong:{
 				trigger:{
 					source:'damageSource',
 					player:'damageEnd',
@@ -10367,6 +10439,59 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 					player.line(targets);
 				},
 			},
+			lgs_liangcong:{
+				trigger:{source:'damageSource'},
+				filter(event,player){
+					// if(event.player==player||!event.player.isAlive()||!player.isAlive()) return false;
+					return player.hasCard(function(card){
+						return event.player.isEmpty(get.subtype(card));
+					},'e');
+				},
+				direct:true,
+				content(){
+					'step 0'
+					event.time=get.utc();
+					player.choosePlayerCard(player,'e','是否发动【良从】，将你的一张装备牌移动给'+get.translation(trigger.player)+'？').set('filterButton',function(button){
+						return _status.event.getTrigger().player.isEmpty(get.subtype(button.link));
+					}).set('ai',function(button){
+						var player=_status.event.player,target=_status.event.getTrigger().player
+						if(get.attitude(player,target)>0) return get.effect(target,button.link,target,player);
+						if(player.hasSkill('lgs_liangcong')&&player.isMaxEquip(true)) return 8-get.equipValue(button.link);
+						return 5-get.equipValue(button.link);
+					});
+					'step 1'
+					if(result.bool){
+						// game.delay(2);
+						var time=1000-(get.utc()-event.time);
+						if(time>0){
+							game.delay(0,time);
+						}
+						player.logSkill('lgs_liangcong',trigger.player);
+						player.$give(result.links[0],trigger.player,false);
+						trigger.player.equip(result.links[0]);
+					}else
+						event.finish();
+					'step 2'
+					if(trigger.player.hp<trigger.player.maxHp){
+						player.chooseControl('摸3张牌','令'+get.translation(trigger.player)+'回复体力').set('ai',function(evt, player){
+							var target=evt.getTrigger().player
+							if(get.attitude(player,target)<=0) return 0;
+							if(target.hp<2) return 1;
+							return 0;
+						});
+					}else{
+						player.draw(3);
+						event.finish();
+					}
+					'step 3'
+					if(result.control=='摸3张牌'){
+						player.draw(3);
+					}else{
+						player.addExpose(0.2);
+						trigger.player.recover(1,player);
+					}
+				},
+			},
 			lgs_gufang:{
 				trigger:{player:'phaseJieshuBegin'},
 				filter:function(event,player){
@@ -10385,6 +10510,70 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 					else
 						event.finish();
 					'step 2'
+					if(result.bool)
+						player.draw();
+				},
+			},
+			lgs_newgufang:{
+				trigger:{player:'phaseJieshuBegin'},
+				filter:function(event,player){
+					return player.isMaxEquip(true)||game.hasPlayer(function(current){
+						return current.hasCard(function(card){
+							return player.isEmpty(get.subtype(card));
+						},'e');
+					});  // player.canMoveCard(null,true)
+				},
+				forced:true,
+				locked:false,
+				frequent:true,
+				content:function(){
+					'step 0'
+					if(!player.isMaxEquip(true)){
+						// player.moveCard('是否发动【孤芳】，移动场上的一张装备牌？').nojudge=true;
+						var next=player.chooseTarget('是否发动【孤芳】，将场上的一张装备牌移入你的装备区？',function(card,player,target){
+							return target.hasCard(function(cardx){
+								return player.isEmpty(get.subtype(cardx));
+							},'e');
+						}).set('ai',function(target){
+							var player=_status.event.player
+							var att=get.attitude(player,target)
+							if(att>0&&(player.isMaxEquip(true)||!player.hasSkill('lgs_liangcong'))) return 0;
+							var value=0
+							for(var card of target.getCards('e',function(cardx){
+								return player.isEmpty(get.subtype(cardx));
+							}))
+								if(get.equipValue(cardx)>value)
+									value=get.equipValue(cardx);
+							if(att>0) return (9-value)/10;
+							return value;
+						});
+					}else
+						event.goto(3);
+					'step 1'
+					if(result.bool){
+						var target=result.targets[0]
+						event.target=target;
+						player.choosePlayerCard(target,'e','将'+get.translation(target)+'的一张装备牌移入你的装备区').set('filterButton',function(button){
+							return _status.event.player.isEmpty(get.subtype(button.link));
+						}).set('ai',function(button){
+							var player=_status.event.player,target=_status.event.getParent().target
+							if(get.attitude(player,target)>0) return 99-get.equipValue(button.link);
+							return 5-get.equipValue(button.link);
+						});
+					}else
+						event.goto(3);
+					'step 2'
+					if(result.bool){
+						target.$give(result.links[0],player,false);
+						player.equip(result.links[0]);
+					}else
+						event.goto(0);
+					'step 3'
+					if(player.isMaxEquip(true))
+						player.chooseBool('是否发动【孤芳】，摸1张牌？').set('frequentSkill','lgs_gufang');
+					else
+						event.finish();
+					'step 4'
 					if(result.bool)
 						player.draw();
 				},
@@ -12253,9 +12442,9 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 			"lgs_huiweix":"麾围",
 			"lgs_huiweix_info":"锁定技，其他角色回合开始时，若其有“惊”标记，其弃置“惊”标记并选择一项：1.弃置2张非装备牌；2.交给你1张装备牌。",
 			"lgs_jingshu":"静姝",
-			"lgs_jingshu_info":"当你即将因弃置而失去牌时，你可以保留其中的任意张牌，若如此做，下一次你即将因弃置而失去这些牌时不可再保留这些牌，且失去后你受到一点伤害。",
+			"lgs_jingshu_info":"当你因弃置而失去牌时，你失去X点体力（X为这些牌中有〖静姝〗标记的牌数），然后你可以获得失去的牌中的任意张没有〖静姝〗标记的牌，以此法获得的牌获得〖静姝〗标记。 ",
 			"lgs_duyi":"笃毅",
-			"lgs_duyi_info":"出牌阶段限一次，或当你受到伤害后，你可以选择一项：1.将一张牌置于武将牌上称为“毅”，然后摸一张牌；2.获得任意张“毅”。若如此做，若你的“毅”数量等于体力值，你回复一点体力。",
+			"lgs_duyi_info":"每回合限一次，出牌阶段或当你受到伤害时，你可以选择一项：1.将一张手牌置于武将牌上称为“毅”，然后摸1张牌；2.获得任意张“毅”。若如此做，若你的“毅”数量等于体力值，你回复1点体力。",
 			"lgs_xiaokan":"笑侃",
 			"lgs_xiaokan_info":"出牌阶段，你可以弃置一名手牌数不小于你的其他角色一张牌，若如此做，其选择一项：1.摸X张牌并翻面（X为其手牌数且至多为4），然后本回合你不能再发动〖笑侃〗；2.受到你造成的一点伤害，然后视为对你使用一张【杀】。",
 			"lgs_caisi":"才思",
@@ -12281,7 +12470,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 			"lgs_shuangzhi":"爽直",
 			"lgs_shuangzhi_info":"每回合限一次，当你成为其他角色非伤害类锦囊牌的目标时，你可以对其造成一点伤害。",
 			"lgs_kaizhu":"慨助",
-			"lgs_kaizhu_info":"出牌阶段，你可以将装备区或判定区的一张牌移动给其他角色并令其回复一点体力，然后你废除对应区域；其他角色与你计算距离+X（X为你废除的区域数）；其他角色失去因〖慨助〗进入其区域的牌后，你恢复你的对应区域。",
+			"lgs_kaizhu_info":"出牌阶段，你可以将装备区或判定区的一张牌移动给其他角色并令其回复一点体力，然后你废除对应区域；其他角色失去因〖慨助〗进入其区域的牌后，你恢复你的对应区域。其他角色与你计算距离+X（X为你废除的区域数）。",
 			"lgs_jiangxin":"匠心",
 			"lgs_jiangxin_info":"当你受到伤害后，可以弃置两张牌（不足则全弃，无牌则不弃），然后摸一张牌并展示之。若你以此法弃置与摸的牌：1.有至少两张花色相同，你摸两张牌；2.三张花色相同，你可以再次发动〖匠心〗。",
 			"lgs_mengxu":"梦续",
@@ -12313,9 +12502,9 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 			"lgs_weizun":"唯尊",
 			"lgs_weizun_info":"限定技，出牌阶段，你可以选择一名目标，然后令除你以外的所有角色依次执行：其可以对该目标使用一张牌，若其使用了牌，本局游戏你于出牌阶段可使用杀的次数+1，若其未使用牌，你可以视为对其使用一张杀（不计次数）。",
 			"lgs_liangcong":"良从",
-			"lgs_liangcong_info":"当你受到或造成伤害时，你可以选择一项：1.弃置伤害来源的武器牌和受伤角色的防具牌；2.弃置伤害来源的进攻马和受伤角色的防御马。",
+			"lgs_liangcong_info":"当你对其他角色造成伤害时，你可以将装备区的一张牌移入该角色的装备区，然后你可以选择一项：1.你摸3张牌；2.该角色回复1点体力。",
 			"lgs_gufang":"孤芳",
-			"lgs_gufang_info":"结束阶段，你依次执行以下两项：1.若你装备区牌的数量不为全场唯一最多，你可以移动场上的一张装备牌；2.若你装备区牌的数量为全场唯一最多，你可以摸一张牌。",
+			"lgs_gufang_info":"结束阶段，你依次执行以下两项：1.若你装备区的牌数不为全场唯一最多，你可以将场上的一张装备牌移入你的装备区；2.若你装备区的牌数为全场唯一最多，你可以摸1张牌。",
 			"lgs_yasi":"雅思",
 			"lgs_yasi_info":"出牌阶段限一次，你可以弃置一张红色牌，令一名角色进行一次判定，若点数不小于7，其摸两张牌并回复一点体力。",
 			"lgs_linuo":"立诺",
@@ -12422,6 +12611,9 @@ game.import('character',function(lib,game,ui,get,ai,_status){
     },
     intro:(function(){
 		var log = [
+			'update in 2024/4/4',
+			'- 调整技能：〖良从〗〖静姝〗〖笃毅〗',
+			'',
 			'update in 2024/3/23',
 			'- 调整技能：〖亲和〗〖深怀〗，修复技能〖宏器〗的bug',
 			'- 为多个技能添加语音',
