@@ -1459,7 +1459,8 @@ return {
 				'step 1'
 				if (result.bool){
 					player.logSkill('lgs_xiushen');
-					trigger.target.give(result.cards,player);
+					player.gain(result.cards,trigger.target,'give');
+					// trigger.target.give(result.cards,player);
 				}
 				else
 					event.finish();
@@ -1474,7 +1475,8 @@ return {
 				}()>=0);
 				'step 3'
 				if (result.bool)
-					player.give(result.cards,trigger.target);
+					trigger.target.gain(result.cards,player,'give');
+					// player.give(result.cards,trigger.target);
 			},
 		},
 		"lgs_qishi":{
@@ -5032,6 +5034,8 @@ return {
 			},
 			enable:'chooseToUse',
 			hiddenCard:function(player,name){
+				if(player.hasSkill('lgs_xiyan_block')) return false;
+				if(player.storage.lgs_xiyan_disable.contains(name)) return false;
 				if(_status.event.name!='chooseToUse') return false;
 				if(name!='sha'&&get.type(name)!='trick') return false;
 				if(!lib.card[name].filterTarget) return false;
@@ -5041,9 +5045,16 @@ return {
 				return _status.event.filterCard({name:name,isCard:true,storage:{lgs_xiyan:player}},player,event);
 			},
 			filter:function(event,player){
+				if(player.hasSkill('lgs_xiyan_block')) return false;
 				if(event.responded) return false;
-				if(event.filterCard({name:'sha',isCard:true,storage:{lgs_xiyan:player}},player,event)) return true;
+				if(!player.storage.lgs_xiyan_disable.contains('sha')){
+					if(event.filterCard({name:'sha',isCard:true,storage:{lgs_xiyan:player}},player,event)) return true;
+					for(var nature of lib.inpile_nature)
+						if(event.filterCard({name:'sha',nature:nature,isCard:true,storage:{lgs_xiyan:player}},player,event))
+							return true;
+				}
 				for(var i of lib.inpile){
+					if(player.storage.lgs_xiyan_disable.contains(i)) continue;
 					if(!lib.card[i].filterTarget) continue;
 					if(lib.card[i].selectTarget==-1&&game.countPlayer(function(current){
 						return player.canUse({name:i,isCard:true},current); // lib.card[i].filterTarget({name:i,isCard:true},player,current);
@@ -5074,7 +5085,11 @@ return {
 				},
 				check:function(button){
 					var player=_status.event.player,vcard=button.link
-					return 0.1*player.getUseValue({name:vcard[2],nature:vcard[3],isCard:true})+(player.countCards('h',vcard[2])>0?5:(2+0.25*player.countCards('h')))*Math.random();
+					var useValue=player.getUseValue({name:vcard[2],nature:vcard[3],isCard:true,storage:{lgs_xiyan:player}})
+					if(useValue<=0) return 0;
+					var value=0.1*useValue+(player.countCards('h',vcard[2])>0?5:(2+0.25*player.countCards('h')))*Math.random();
+					game.log('xiyan-check: ',vcard[2],vcard[3],value);
+					return value;
 				},
 				backup:function(links,player){
 					return {
@@ -5083,6 +5098,7 @@ return {
 							nature:links[0][3],
 							isCard:true,
 							storage:{lgs_xiyan:player},
+							lgs_xiyan:true,
 						},
 						filterCard:()=>false,
 						selectCard:-1,
@@ -5095,25 +5111,21 @@ return {
 							player.logSkill('lgs_xiyan');
 							player.addTempSkill('lgs_xiyan_disable');
 							player.storage.lgs_xiyan_disable.push(event.result.card.name);
-							game.log(player,'声明了【',event.result.card.name,'】');
-							event.result.card={
-								name:event.result.card.name,
-								nature:event.result.card.nature,
-								isCard:true,
-								storage:{lgs_xiyan:player},
-							};
+							game.log(player,'对',event.result.targets,'声明了',event.result.card);
 						},
-						ai:{
-							result:{
-								target:function(player,target){
-									if(!target.countCards('he')) return 0;
-								},
-							},
-						},
+						// ai:{
+						// 	result:{
+						// 		target:function(player,target){
+						// 			if(!target.countCards('he')) return 0;
+						// 		},
+						// 	},
+						// },
 					};
 				},
 				prompt:function(links,player){
-					return '令一名目标猜测你手牌中是否有【'+get.translation(links[0][2])+'】';
+					return '令一名目标猜测你手牌中是否有'
+							+get.translation(links[0][3])
+							+'【'+get.translation(links[0][2])+'】';
 				},
 			},
 			mod:{
@@ -5122,7 +5134,7 @@ return {
 				},
 			},
 			ai:{
-				order:11,
+				order:12,
 				respondSha:true,
 				result:{
 					player:function(player){
@@ -5130,9 +5142,15 @@ return {
 						return 1;
 					},
 				},
+				effect:{
+					player:function(card,player,target){
+						if(_status.event.result.skill=='lgs_xiyan_backup'&&!target.countCards('he')) return [0,0,0,0];
+					},
+				},
 			},
 			group:'lgs_xiyan_guess',
 			subSkill:{
+				block:{charlotte:true},
 				disable:{
 					charlotte:true,
 					onremove:function(player){
@@ -5162,17 +5180,19 @@ return {
 						});
 						'step 1'
 						target.chat(result.bool?'有':'没有');
-						if(!result.bool&&player.countCards('h',{name:trigger.card.name,nature:trigger.card.nature})&&target.countCards('he')){
-							game.delay();
-							event.goto(3);
-						}
-						if(result.bool&&!player.countCards('h',{name:trigger.card.name,nature:trigger.card.nature})){
+						var card_info={name:trigger.card.name,nature:trigger.card.nature}
+						if(result.bool&&!player.countCards('h',card_info)){
 							game.delay();
 							event.goto(4);
 						}
 						else{
 							event.getParent(4).goto(0);
 							trigger.cancel();
+							if(!result.bool&&player.countCards('h',card_info)&&target.countCards('he')){
+								game.delay();
+								event.goto(3);
+							}else
+								player.addTempSkill('lgs_xiyan_block');
 						}
 						'step 2'
 						event.finish();
@@ -9387,6 +9407,7 @@ return {
 						if(player.isDisabled(i))
 							num++;
 					if(player.storage._disableJudge) num++;
+					dialog.addText('手牌上限+<span class="bluetext">'+num+'</span>');
 					dialog.addText('其他角色与'+get.translation(player)+'计算距离+<span class="bluetext">'+num+'</span>');
 					dialog.addText('场上因慨助移动的牌：');
 					var list=[]
@@ -9398,32 +9419,84 @@ return {
 			},
 			enable:"phaseUse",
 			filter:function(event,player){
-				return player.countCards('ej',function(card){
+				return player.hasCard(function(card){
 					return game.hasPlayer(function(current){
-						return current.isEmpty(get.subtype(card));
+						return lib.skill.lgs_kaizhu.filterCardTarget(card,player,current);
 					});
-				});
+				},'ej');
+			},
+			filterCardTarget:function(card,player,target){
+				if(target==player) return false;
+				if(get.position(card)=='j') return target.canAddJudge(card);
+				return target.isEmpty(get.subtype(card))
+			},
+			checkCardTarget:function(card,player,target){
+				var value=get.effect(target,{name:'recover'},player,player)
+				var att=get.sgnAttitude(player,target)
+				if(player.needsToDiscard()){  // 增加手牌上限效果可以带来的价值等同于多保留的一张牌的价值
+					var values=player.get('h').map(function(x){return get.value(x)})
+					values.sort(function(a,b){return a>b});
+					value+=values[values.length-player.getHandcardLimit()-1];
+				}
+				if(get.position(card)=='e'){
+					value-=get.equipValue(card,player);
+					value+=att*get.equipValue(card,target);
+				}else{
+					value-=get.effect(player,card,player,player);
+					value+=get.effect(target,card,player,player);
+				}
+				return value;
 			},
 			delay:false,
 			log:false,
 			content:function(){
 				'step 0'
-				var cards_equip = player.get('e');
-				var cards_judge = player.get('j');
+				game.log('kaizhu-in');
+				var es = player.get('e');
+				var js = player.get('j');
+				// ai
+				var card_target_values=[]
+				for(var card of es.concat(js))
+					game.countPlayer(function(current){
+						if(!lib.skill.lgs_kaizhu.filterCardTarget(card,player,current)) return;
+						var value=lib.skill.lgs_kaizhu.checkCardTarget(card,player,current)
+						if(value>0) card_target_values.push([card,current,value]);
+					});
+				event.go=false;
+				if(card_target_values.length){
+					event.go=true;
+					card_target_value = card_target_values.reduce(function(max,current){
+						return current[2] > max[2] ? current : max;
+					});
+					event.aicard=card_target_value[0];
+					event.aitarget=card_target_value[1];
+				}
+				game.log('kaizhu-ai: ',event.go,event.aicard,event.aitarget,card_target_value[2]);
+				// end ai
 				var choice = ['慨助：选择要移动的牌'];
-				if(cards_equip.length>0) choice.push('装备区',cards_equip);
-				if(cards_judge.length>0) choice.push('判定区',cards_judge);
-				player.chooseButton(choice);
+				if(es.length>0) choice.push('装备区',es);
+				if(js.length>0) choice.push('判定区',js);
+				player.chooseButton(choice).set('filterButton',function(button){
+					return game.hasPlayer(function(current){
+						return lib.skill.lgs_kaizhu.filterCardTarget(card,player,current);
+					});
+				}).set('ai',function(button){
+					if(!event.go) return 0;
+					if(button.link==event.aicard) return 1;
+					return 0;
+				});
 				'step 1'//选择牌
 				if(!result.bool){
 					event.finish();
 					return;
 				}
-				event.card_move = result.links[0];
+				event.card = result.links[0];
 				player.chooseTarget(function(card,player,target){//选择目标
-					if(!event.card_move) return false;
-					if(get.position(event.card_move)=='e'&&!target.isEmpty(get.subtype(event.card_move))) return false;
-					return true;
+					return lib.skill.lgs_kaizhu.filterCardTarget(event.card,player,target);
+				}).set('ai',function(target){
+					if(!event.go) return 0;
+					if(target==event.aitarget) return 1;
+					return 0;
 				});
 				'step 2'
 				if(!result.bool){
@@ -9433,33 +9506,36 @@ return {
 				var target=result.targets[0]
 				event.target=target;
 				player.logSkill('lgs_kaizhu',target);
-				player.$give(event.card_move,target,false);
-				if(get.position(event.card_move) == 'e'){
+				player.addExpose(0.2);
+				player.$give(event.card,target,false);
+				if(get.position(event.card) == 'e'){
 					var mark = 0;
 					for(var i=1;i<=5;++i){
-						if(event.card_move == player.get('e',i.toString())){
+						if(event.card == player.get('e',i.toString())){
 							mark = i;
 						}
 					}
-					target.equip(event.card_move);
+					target.equip(event.card);
 					player.disableEquip(mark);
 				}
 				else{//移动判定
-					player.$give(event.card_move,target,false);
+					player.$give(event.card,target,false);
 					game.delay(0.5);
-					target.addJudge(event.card_move);
+					target.addJudge(event.card);
 					player.disableJudge();
 				}
 				var i;
 				for(i=1;i<=5;++i){
-					if(get.subtype(event.card_move) == 'equip' + i){
-						player.storage.lgs_kaizhu[i] = event.card_move;
+					if(get.subtype(event.card) == 'equip' + i){
+						player.storage.lgs_kaizhu[i] = event.card;
 						break;
 					}
 				}
 				if(i>5){
-					player.storage.lgs_kaizhu[0] = event.card_move;
+					player.storage.lgs_kaizhu[0] = event.card;
 				}
+				'step 3'
+				game.delay();
 				target.recover();
 			},
 			mod:{
@@ -9470,6 +9546,29 @@ return {
 							num++;
 					if(to.storage._disableJudge) num++;
 					return distance+num;
+				},
+				maxHandcard:function(player,num){
+					for(var i=1;i<6;i++)
+						if(player.isDisabled(i))
+							num++;
+					if(player.storage._disableJudge) num++;
+					return num;
+				},
+			},
+			ai:{
+				order:1,
+				result:{
+					player:function(player){
+						var values=[]
+						for(var card of player.get('ej')){
+							game.countPlayer(function(current){
+								if(!lib.skill.lgs_kaizhu.filterCardTarget(card,player,current)) return;
+								var value=lib.skill.lgs_kaizhu.checkCardTarget(card,player,current)
+								values.push(value);
+							});
+						}
+						return Math.max(...values);
+					},
 				},
 			},
 			group:['lgs_kaizhu_judgeLose','lgs_kaizhu_mark'],
@@ -9543,15 +9642,40 @@ return {
 			content:function(){
 				'step 0'
 				if(player.countCards('he')<=2)
-					player.chooseBool('是否发动匠心？');
+					player.chooseBool('是否发动匠心？').set('ai',function(){
+						var cards=player.getCards('he')
+						if(cards.length==0) return true;
+						if(cards.length==1) return get.value(cards[0])<6;
+						return get.value(cards[0])+get.value(cards[1])<6+(get.suit(cards[0])==get.suit(cards[1])?8:0);
+					});
 				else
 					event.choose=true;
 				'step 1'
 				if(result&&result.bool)
-					player.chooseToDiscard('请弃置两张牌','he',2,true);
-				else if(event.choose)
-					player.chooseToDiscard('是否发动匠心，弃置两张牌？','he',2);
-				else
+					player.chooseToDiscard('请弃置两张牌','he',2,true).set('logSkill','lgs_jiangxin');
+				else if(event.choose){
+					// ai
+					var cards=player.getCards('he')
+					var aicards, maxValue
+					game.log('jiangxin-ai-aicards:',aicards);
+					for(var i=0;i<cards.length-1;i++){
+						for(var j=i+1;j<cards.length;j++){
+							var value=6-get.value(cards[i])-get.value(cards[j])
+							if(get.suit(cards[i])==get.suit(cards[j])) value+=8;
+							game.log(cards[i],cards[j],value);
+							if(aicards==undefined||value>maxValue){
+								aicards=[cards[i],cards[j]];
+								maxValue=value;
+							}
+						}
+					}
+					game.log('jiangxin-ai-aicards:',aicards);
+					// end ai
+					player.chooseToDiscard('是否发动匠心，弃置两张牌？','he',2).set('ai',function(card){
+						if(!aicards) return 0;
+						return aicards.contains(card);
+					}).set('logSkill','lgs_jiangxin');
+				}else
 					event.finish();
 				'step 2'
 				event.Jcards = [];
@@ -9571,8 +9695,10 @@ return {
 						max=suits[key];
 				if(max>=2)
 					player.draw(2);
-				if(max>=3)
+				if(max>=3){
+					player.recover();
 					event.goto(0);
+				}
 			},
 		},
 		lgs_mengxu:{
@@ -10439,10 +10565,14 @@ return {
 				// game.log('weizun',event.targets);
 				'step 1'
 				event.current=event.targets.shift();
-				event.current.chooseToUse().set('targetRequired',true).set('complexSelect',true).set('targetRequired',true).set('filterTarget',function(card,player,target){
-					if(target!=_status.event.sourcex&&!ui.selected.targets.contains(_status.event.sourcex)) return false;
-					return lib.filter.filterTarget.apply(this,arguments);
-				}).set('sourcex',target);
+				if(!target.isAlive()) event.finish();
+				else if(event.current.isAlive()){
+					event.current.chooseToUse().set('targetRequired',true).set('complexSelect',true).set('targetRequired',true).set('filterTarget',function(card,player,target){
+						if(target!=_status.event.sourcex&&!ui.selected.targets.contains(_status.event.sourcex)) return false;
+						return lib.filter.filterTarget.apply(this,arguments);
+					}).set('sourcex',target);
+				}else
+					event.redo();
 				'step 2'
 				if(result.bool){
 					player.addSkill('lgs_weizun_shaMod');
@@ -11111,10 +11241,18 @@ return {
 			direct:true,
 			content:function(){
 				'step 0'
-				player.chooseToDiscard(get.prompt2('lgs_jueyi',trigger.target),'he').set('ai',function(card){
+				var target=trigger.target
+				// ai
+				var go=false,effect=get.effect(trigger.target,trigger.card,trigger.player,player)
+				if(effect>5) go=true;
+				if(effect>0&&trigger.parent.baseDamage>1&&!target.countCards('e','baiyin')
+						&&(target.countCards('h')>0||target.hasSkillTag('respondShan',true,null,true)))
+					go=true;
+				// end ai
+				player.chooseToDiscard(get.prompt2('lgs_jueyi',target),'he').set('ai',function(card){
 					if(!_status.event.go) return 0;
-					return get.unuseful(card);
-				}).set('go',get.effect(trigger.target,trigger.card,trigger.player,player)>0&&trigger.target.mayHaveShan());
+					return 8+get.disvalue(card);
+				}).set('go',go);
 				'step 1'
 				if(result.bool){
 					player.logSkill('lgs_jueyi',trigger.target);
@@ -11680,7 +11818,8 @@ return {
 				result:{
 					player:function(player,target){
 						var card=player.storage.lgs_shouye[0]
-						return player.getUseValue({name:card.name,nature:card.nature})+2;
+						var value=player.getUseValue({name:card.name,nature:card.nature})+2;
+						game.log('shouye-result',value);
 					},
 				}
 			},
@@ -12130,17 +12269,21 @@ return {
 			logTarget:'player',
 			check:function(event,player){
 				var evt=event.getParent('phaseLoop',true)
-				if(evt&&trigger.skill==undefined){
+				if(evt&&event.skill==undefined){
 					var effects=[]
 					game.countPlayer(function(current){
-						if(player!=event.player&&get.attitude(player,event.player)<0)
-							effects.push([current,get.rawDistance(player,event.player,'left')]);
+						if(player!=current&&get.attitude(player,current)<0)
+							effects.push([current,get.rawDistance(player,current,'left')]);
 					})
 					if(!effects.length) return false;
-					effects.sort(function(a,b){return a[1]<b[1]});
-					game.log('huanzhu-check-effects:');
-					game.logResult(effects);
-					return event.player==effects[0][0];
+					// effects.sort(function(a,b){return a[1]<b[1]});
+					// return event.player==effects[0][0];
+					var effect=effects.reduce(function(max,current){
+						return current[1]>max[1]?current:max;
+					});
+					if(event.player!=effect[0]) return false;
+					if(player.isHealthy()) return effect[1]>(game.countPlayer()-1)/2;
+					return true;
 				}
 				return false;
 			},
@@ -12165,6 +12308,9 @@ return {
 				// if(evt&&evt.player==trigger.player)  // 若非额外回合
 				if(evt&&trigger.skill==undefined)
 					evt.player=player;
+			},
+			ai:{
+				expose:0.3,
 			},
 			group:'lgs_huanzhu_turnOver',
 			subSkill:{
@@ -12802,20 +12948,36 @@ skill:{
 },
 intro:(function(){
 	var log = [
+		'update in 2024/05/30',
+		'- 修改技能：齐悦〖慨助〗〖匠心〗',
+		'- 调整SP朱辛坤〖修身〗交出牌的方式为正面朝上',
+		'- 修复于斌〖戏言〗对方猜中不会失效的bug',
+		'- 修复王文煊〖唯尊〗目标角色阵亡后仍继续执行的bug',
+		'- 修复于斌〖戏言〗ai有时不发动的bug，并优化ai判定',
+		'- 修复SP王逸轩〖换柱〗ai必定发动的bug，并优化ai判定',
+		'- 修复李炤甫〖决意〗ai不发动的bug，并优化ai判定',
+		'- 为齐悦〖慨助〗〖匠心〗添加技能ai',
+		'',
 		'update in 2024/05/28',
-		'- 调整技能：于斌〖戏言〗',
-		'- 修复李筱汀〖信行〗无法视为使用【无懈可击】的bug',
-		'- 修复sp王逸轩〖偷梁〗无法执行摸牌阶段的bug',
+		'- 修改技能：于斌〖戏言〗',
+		'- 修复李筱汀〖信行〗无法使用【无懈可击】的bug',
+		'- 修复SP王逸轩〖偷梁〗无法执行摸牌阶段的bug',
 		'- 修复于筱然〖笃毅〗部分情况下无法选择取消的bug',
-		'- 为于筱然〖笃毅〗、王琳璟〖笑侃〗、sp王逸轩〖换柱〗添加技能ai',
+		'- 修复李筱汀〖镇纪〗ai价值计算错误的bug',
+		'- 为于筱然〖笃毅〗、王琳璟〖笑侃〗、SP王逸轩〖换柱〗添加技能ai',
 		'',
 		'update in 2024/04/04',
-		'- 调整技能：魏欣然〖良从〗、于筱然〖静姝〗〖笃毅〗',
+		'- 修改技能：魏欣然〖良从〗、于筱然〖静姝〗〖笃毅〗',
 		'',
 		'update in 2024/03/23',
-		'- 调整技能：郭晶珺〖亲和〗、逯业扬〖深怀〗',
+		'- 修改技能：郭晶珺〖亲和〗、逯业扬〖深怀〗',
 		'- 修复綦俊凯〖宏器〗部分情况下无法选择取消的bug',
 		'- 为多个技能添加语音',
+		'',
+		'update in 2024/03/21',
+		'- 修改技能：李易非〖驰疆〗〖会友〗、王祺〖憬遥〗',
+		'- 为王祺添加技能〖芳许〗（觉醒后获得）',
+		'- 为李易非〖会友〗添加技能ai',
 		'',
 		'...',
 		'',
@@ -12842,7 +13004,7 @@ intro:(function(){
 		'- 添加了SP汉坤成、蒲谦、陈耀仕和刘通的技能AI，和各武将技能的威胁度；修改了SP任冠宇〖轻身〗AI',
 		'- 修复了刘通手牌数等于体力值时，失去装备会触发〖易安〗的bug',
 		'v1.04.1 2022-6-19',
-		'- SP朱辛坤添加主公技“修身”',
+		'- SP朱辛坤添加主公技〖修身〗',
 		'- 按照新版技能描述，修改了SP朱辛坤〖烈魄〗，发动时无需展示手牌，有闪时不能发动',
 		'- 按照新版技能描述，修改了SP汉坤成〖言欢〗，改为只能自己摸牌。（实际效果：无需点击选择目标，手感更丝滑）',
 		'v1.04 2022-6-14',
